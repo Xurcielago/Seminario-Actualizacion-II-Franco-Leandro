@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caja de Texto</title>
+    <style>
+        body {
+            text-align: center;
+            margin-top: 50px;
+            font-family: sans-serif;
+        }
+        .caja-texto {
+            padding: 10px;
+            width: 250px;
+        }
+        .boton-accion {
+            padding: 10px 15px;
+            cursor: pointer;
+        }
+
+        /* Clases de estado */
+        .tema-claro {
+            background-color: white;
+            color: black;
+        }
+        .tema-oscuro {
+            background-color: black;
+            color: white;
+        }
+        .tema-celeste {
+            background-color: lightblue;
+            color: red;
+        }
+    </style>
+</head>
+<body>
+
+    <input 
+        type="text" 
+        id="entradaTexto" 
+        placeholder="Escribe y presiona Enter" 
+        class="caja-texto tema-claro"
+    >
+
+    <br><br>
+    <button id="botonColor" class="boton-accion">
+        Cambiar Colores
+    </button>
+
+    <script>
+        const inputTexto = document.getElementById('entradaTexto');
+        const botonColor = document.getElementById('botonColor');
+
+        inputTexto.addEventListener('keydown', (evento) => {
+            if (evento.key === 'Enter') {
+                alert(inputTexto.value);
+            }
+        });
+
+        const clasesTema = ['tema-claro', 'tema-oscuro', 'tema-celeste'];
+        
+        let indiceEstadoActual = 0;
+
+        botonColor.addEventListener('click', () => {
+            inputTexto.classList.remove(clasesTema[indiceEstadoActual]);
+            
+            indiceEstadoActual = (indiceEstadoActual + 1) % clasesTema.length;
+            
+            inputTexto.classList.add(clasesTema[indiceEstadoActual]);
+        });
+    </script>
+</body>
+</html>
