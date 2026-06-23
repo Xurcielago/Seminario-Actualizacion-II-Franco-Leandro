@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Entrenador y = 2x + 6</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+</head>
+<body>
+  <h1>Modelo para predecir y = 2x + 6</h1>
+  <div id="estado">Entrenando modelo.</div>
+  <br>
+  <div id="prediccion" style="display: none;">
+    <label for="inputX">Ingrese el valor de X:</label>
+    <input type="number" id="inputX" step="any" value="0">
+    <button id="predecirBtn">Predecir Y</button>
+    <p>Resultado: <strong><span id="resultadoY"></span></strong></p>
+  </div>
+
+  <script>
+    (async function() {
+      const n = 9;
+      const xVals = Array.from({ length: n }, (_, i) => -6 + i);
+      const yVals = xVals.map(x => 2 * x + 6);
+
+      const xs = tf.tensor2d(xVals, [n, 1]);
+      const ys = tf.tensor2d(yVals, [n, 1]);
+
+      const model = tf.sequential();
+      model.add(tf.layers.dense({ units: 1, inputShape: [1] }));
+
+      model.compile({
+        optimizer: tf.train.adam(0.1), 
+        loss: 'meanSquaredError'
+      });
+
+      const epocas = 350;
+      await model.fit(xs, ys, {
+        epochs: epocas,
+        callbacks: {
+          onEpochEnd: (epoch, logs) => {
+
+            if ((epoch + 1) % 50 === 0 || epoch === 0) {
+              document.getElementById('estado').innerText =
+                `Entrenando... Época ${epoch + 1}/${epocas} - loss: ${logs.loss.toFixed(4)}`;
+            }
+          }
+        }
+      });
+
+      document.getElementById('estado').innerText =
+        'El modelo ya está listo para ser utilizado.';
+      
+      const pesos = model.getWeights();
+      const w = pesos[0].dataSync()[0];
+      const b = pesos[1].dataSync()[0];
+      console.log(`Peso aprendido: ${w.toFixed(4)}, Sesgo aprendido: ${b.toFixed(4)}`);
+
+      xs.dispose();
+      ys.dispose();
+
+      document.getElementById('prediccion').style.display = 'block';
+
+      document.getElementById('predecirBtn').addEventListener('click', () => {
+        const xInput = parseFloat(document.getElementById('inputX').value);
+        if (isNaN(xInput)) {
+          alert('Por favor ingrese un número válido.');
+          return;
+        }
+
+        const entrada = tf.tensor2d([xInput], [1, 1]);
+        const prediccion = model.predict(entrada);
+        const yPred = prediccion.dataSync()[0];
+        document.getElementById('resultadoY').innerText = yPred.toFixed(4);
+
+        entrada.dispose();
+        prediccion.dispose();
+      });
+    })();
+  </script>
+</body>
+</html>

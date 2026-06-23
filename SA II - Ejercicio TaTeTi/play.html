@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tic Tac Toe - IA con TensorFlow.js</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.0.0/dist/tf.min.js"></script>
+    <style>
+        body { font-family: Arial; text-align: center; margin-top: 20px; }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-gap: 5px;
+            justify-content: center;
+            margin: 20px auto;
+        }
+        .cell {
+            width: 100px;
+            height: 100px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            font-size: 48px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .cell.X { color: red; }
+        .cell.O { color: blue; }
+        button {
+            font-size: 16px;
+            padding: 8px 16px;
+            margin-top: 10px;
+        }
+        .status {
+            font-size: 20px;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Tic Tac Toe: Humano (X) vs IA (O)</h1>
+    <div class="status" id="status">Tu turno (X)</div>
+    <div class="board" id="board"></div>
+    <button id="reset">Reiniciar</button>
+
+    <script>
+        // Representación: 0 = vacío, 1 = X (humano), -1 = O (IA)
+        let board = [
+            [0, 0, 0],
+            [0, 0, 0],
+            [0, 0, 0]
+        ];
+        let gameOver = false;
+        let currentTurn = 'human'; // 'human' o 'ai'
+        let model = null;
+
+        // Cargar el modelo
+        async function loadModel() {
+            const modelPath = 'model/ttt_model.json';
+            model = await tf.loadLayersModel(modelPath);
+            console.log("Modelo cargado");
+            // Si quieres ver una predicción inicial para el tablero vacío:
+            // predictBestMove(emptyBoardToTensor());
+        }
+
+        // Convierte el tablero 3x3 a un tensor de 9 elementos (1=humano, -1=IA, 0=vacío)
+        function boardToTensor(board3x3) {
+            // Aplanamos y convertimos: 1 para X (humano), -1 para O (IA)
+            const flat = [];
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    let val = board3x3[i][j];
+                    if (val === 1) flat.push(1);      // X humano
+                    else if (val === -1) flat.push(-1); // O IA
+                    else flat.push(0);
+                }
+            }
+            return tf.tensor([flat]); // forma [1,9]
+        }
+
+        // Predice la mejor jugada para la IA (devuelve {row, col})
+        async function predictBestMove(tensor) {
+            const prediction = model.predict(tensor);
+            const probs = await prediction.reshape([3,3]).data(); // 9 números
+            prediction.dispose();
+            // Encontrar la casilla vacía con mayor probabilidad
+            let bestRow = -1, bestCol = -1;
+            let maxProb = -1;
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    const idx = i * 3 + j;
+                    if (board[i][j] === 0 && probs[idx] > maxProb) {
+                        maxProb = probs[idx];
+                        bestRow = i;
+                        bestCol = j;
+                    }
+                }
+            }
+            return { row: bestRow, col: bestCol };
+        }
+
+        // Verifica si hay ganador o empate
+        function checkWinner(board3x3) {
+            const lines = [
+                [[0,0],[0,1],[0,2]], [[1,0],[1,1],[1,2]], [[2,0],[2,1],[2,2]], // filas
+                [[0,0],[1,0],[2,0]], [[0,1],[1,1],[2,1]], [[0,2],[1,2],[2,2]], // columnas
+                [[0,0],[1,1],[2,2]], [[0,2],[1,1],[2,0]]  // diagonales
+            ];
+            for (let line of lines) {
+                const [a,b,c] = line;
+                const val = board3x3[a[0]][a[1]];
+                if (val !== 0 && val === board3x3[b[0]][b[1]] && val === board3x3[c[0]][c[1]]) {
+                    return val; // 1 (X gana) o -1 (O gana)
+                }
+            }
+            // Empate si no hay vacíos
+            for (let i = 0; i < 3; i++)
+                for (let j = 0; j < 3; j++)
+                    if (board3x3[i][j] === 0) return null;
+            return 0; // empate
+        }
+
+        function updateUI() {
+            const boardDiv = document.getElementById('board');
+            boardDiv.innerHTML = '';
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    const val = board[i][j];
+                    if (val === 1) {
+                        cell.innerText = 'X';
+                        cell.classList.add('X');
+                    } else if (val === -1) {
+                        cell.innerText = 'O';
+                        cell.classList.add('O');
+                    } else {
+                        cell.innerText = '';
+                    }
+                    cell.addEventListener('click', (function(row, col) {
+                        return function() { humanMove(row, col); };
+                    })(i, j));
+                    boardDiv.appendChild(cell);
+                }
+            }
+        }
+
+        async function humanMove(row, col) {
+            if (gameOver) return;
+            if (currentTurn !== 'human') return;
+            if (board[row][col] !== 0) return;
+
+            // Hacer movimiento humano
+            board[row][col] = 1;
+            updateUI();
+            let winner = checkWinner(board);
+            if (winner === 1) {
+                document.getElementById('status').innerText = '¡Ganaste! (X)';
+                gameOver = true;
+                return;
+            } else if (winner === 0) {
+                document.getElementById('status').innerText = 'Empate';
+                gameOver = true;
+                return;
+            }
+            // Cambiar turno a IA
+            currentTurn = 'ai';
+            document.getElementById('status').innerText = 'Turno de la IA (O)...';
+            await aiMove();
+        }
+
+        async function aiMove() {
+            if (gameOver) return;
+            if (currentTurn !== 'ai') return;
+
+            // Obtener el tensor del tablero actual
+            const tensor = boardToTensor(board);
+            const { row, col } = await predictBestMove(tensor);
+            tensor.dispose();
+            if (row === -1 || col === -1) {
+                // No hay movimientos disponibles (empate)
+                let winner = checkWinner(board);
+                if (winner === null) {
+                    document.getElementById('status').innerText = 'Empate';
+                    gameOver = true;
+                }
+                return;
+            }
+            // Hacer movimiento de IA
+            board[row][col] = -1;
+            updateUI();
+            let winner = checkWinner(board);
+            if (winner === -1) {
+                document.getElementById('status').innerText = 'Gana la IA (O)';
+                gameOver = true;
+                return;
+            } else if (winner === 0) {
+                document.getElementById('status').innerText = 'Empate';
+                gameOver = true;
+                return;
+            }
+            // Volver turno humano
+            currentTurn = 'human';
+            document.getElementById('status').innerText = 'Tu turno (X)';
+        }
+
+        function resetGame() {
+            board = [
+                [0, 0, 0],
+                [0, 0, 0],
+                [0, 0, 0]
+            ];
+            gameOver = false;
+            currentTurn = 'human';
+            document.getElementById('status').innerText = 'Tu turno (X)';
+            updateUI();
+        }
+
+        // Inicializar
+        loadModel().then(() => {
+            resetGame();
+        }).catch(err => {
+            console.error("Error cargando modelo:", err);
+            document.getElementById('status').innerText = 'Error: No se pudo cargar el modelo. Asegúrate de que la carpeta "model/" contiene ttt_model.json y .weights.bin';
+        });
+
+        document.getElementById('reset').addEventListener('click', resetGame);
+    </script>
+</body>
+</html>
